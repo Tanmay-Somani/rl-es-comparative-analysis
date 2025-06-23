@@ -45,7 +45,7 @@ class TreasureMazeEnv(gym.Env):
         elif cell_type == 2:
             reward = +2  # reward (blue)
 
-        done = False  # You can add a terminal condition if needed
+        done = False 
         obs = np.array(self.agent_pos, dtype=np.float32)
         return obs, reward, done, False, {}
 
