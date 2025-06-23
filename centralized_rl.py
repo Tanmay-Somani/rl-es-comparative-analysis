@@ -25,7 +25,7 @@ episode_rewards = []
 TIMESTEPS = 5000
 EVAL_EPISODES = 100
 
-print("🚀 Training centralized PPO agent...")
+print("Training centralized PPO agent...")
 model.learn(total_timesteps=TIMESTEPS)
 
 eval_env = TreasureMazeEnv()
@@ -33,7 +33,7 @@ eval_env = TreasureMazeEnv()
 print("🔍 Evaluating trained agent...")
 for episode in tqdm(range(EVAL_EPISODES), desc="Evaluating"):
     obs, _ = eval_env.reset()
-    obs = np.array([obs], dtype=np.float32)  # SB3 expects batch dimension
+    obs = np.array([obs], dtype=np.float32)  
     done = False
     total_reward = 0
     while not done:
@@ -46,4 +46,4 @@ for episode in tqdm(range(EVAL_EPISODES), desc="Evaluating"):
 
 
 save_reward_plot(episode_rewards, filename=os.path.join(log_dir, "reward_plot.png"))
-print(f"✅ Finished centralized RL training. Plot saved to {log_dir}/reward_plot.png")
+print(f" Finished centralized RL training. Plot saved to {log_dir}/reward_plot.png")

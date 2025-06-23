@@ -4,7 +4,6 @@ from grid import TreasureMazeEnv
 from policy import SimpleMLPPolicy
 from logs.utils import log_episode, save_reward_plot
 
-# Hyperparameters
 EPISODES = 100
 POPULATION_SIZE = 50
 SIGMA = 0.2
@@ -16,10 +15,10 @@ os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "episode_rewards.csv")
 
 env = TreasureMazeEnv()
-input_dim = 2  # obs = [x, y]
+input_dim = 2 
 output_dim = env.action_space.n
 policy = SimpleMLPPolicy(input_dim, output_dim)
-theta = policy.get_flat()  # Flattened weights
+theta = policy.get_flat()  
 
 def evaluate(weights):
     policy.set_flat(weights)

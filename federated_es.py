@@ -4,7 +4,6 @@ from grid import TreasureMazeEnv
 from policy import SimpleMLPPolicy
 from logs.utils import log_episode, save_reward_plot
 
-# Configs
 NUM_AGENTS = 3
 ROUNDS = 100
 LOCAL_POP = 20
@@ -14,14 +13,12 @@ LOCAL_ROUNDS = 5
 MOMENTUM = 0.2
 EPISODE_LENGTH = 50
 
-# Logs
 log_dir = "logs/federated_es"
 os.makedirs(log_dir, exist_ok=True)
 log_file = os.path.join(log_dir, "episode_rewards.csv")
 
-# Create envs + policies
 envs = [TreasureMazeEnv(custom_layout=None) for _ in range(NUM_AGENTS)]
-input_dim = 2  # agent (x, y)
+input_dim = 2  
 output_dim = envs[0].action_space.n
 policies = [SimpleMLPPolicy(input_dim, output_dim) for _ in range(NUM_AGENTS)]
 flat_weights = [p.get_flat() for p in policies]
@@ -71,18 +68,15 @@ for rnd in range(ROUNDS):
 
         new_weights.append(theta)
 
-    # Federated averaging with momentum
     avg_weights = sum(new_weights) / NUM_AGENTS
     for i in range(NUM_AGENTS):
         flat_weights[i] = (1 - MOMENTUM) * flat_weights[i] + MOMENTUM * avg_weights
 
-    # Evaluate averaged policy
     test_policy = SimpleMLPPolicy(input_dim, output_dim)
     reward = evaluate(TreasureMazeEnv(), avg_weights, test_policy)
     log_episode(log_file, rnd, reward)
     episode_rewards.append(reward)
     print(f" Eval reward: {reward:.2f}")
 
-# Plot
 save_reward_plot(episode_rewards, os.path.join(log_dir, "reward_plot.png"))
-print(f"\n🎉 Done! Logs and plot saved to: {log_dir}")
+print(f"\n Done! Logs and plot saved to: {log_dir}")
