@@ -30,7 +30,7 @@ model.learn(total_timesteps=TIMESTEPS)
 
 eval_env = TreasureMazeEnv()
 
-print("🔍 Evaluating trained agent...")
+print("Evaluating trained agent...")
 for episode in tqdm(range(EVAL_EPISODES), desc="Evaluating"):
     obs, _ = eval_env.reset()
     obs = np.array([obs], dtype=np.float32)  

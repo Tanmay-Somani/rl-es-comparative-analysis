@@ -67,7 +67,7 @@ for rnd in tqdm(range(ROUNDS), desc="Federated Rounds"):
     avg_reward = total_eval_reward / EVAL_EPISODES
     log_episode(log_file, rnd, avg_reward)
     episode_rewards.append(avg_reward)
-    print(f"✅ Avg Eval Reward: {avg_reward:.2f}")
+    print(f"Avg Eval Reward: {avg_reward:.2f}")
 
 
 save_reward_plot(episode_rewards, filename=os.path.join(log_dir, "reward_plot.png"))
