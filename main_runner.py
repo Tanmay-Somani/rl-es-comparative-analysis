@@ -29,9 +29,11 @@ def main():
         action="store_true",
         help="Visualize final policy after training (if supported)"
     )
-    parser.add_argument(
-        "--help"
-    )
+    # parser.add_argument(
+    #     "--help",
+    #     action="help",
+    #     help="Show this help message and exit",
+    # )
     args = parser.parse_args()
 
     mode_to_script = {
