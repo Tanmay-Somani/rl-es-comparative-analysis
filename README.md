@@ -44,6 +44,24 @@ This project aims to evaluate and compare the performance of RL and ES algorithm
   Comparison of model weight sharing vs. gradient sharing.
 
 ## 📁 Directory Structure
+rl-es-comparative-analysis/
+│
+├── environments/
+│ └── treasure_maze.py # Custom Gym-compatible grid environment
+│
+├── centralized_rl.py # RL agent with centralized training
+├── centralized_es.py # ES agent with centralized training
+├── federated_rl.py # RL agent with federated training
+├── federated_es.py # ES agent with federated training
+│
+├── utils/
+│ ├── logger.py # Logging utilities
+│ └── federated_core.py # Federated learning utilities
+│
+├── results/
+│ └── plots/ # Learning curves and evaluation graphs
+│
+└── README.md
 
 # 🚀 Getting Started
 
