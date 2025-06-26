@@ -1,79 +1,64 @@
 # RL-ES Comparative Analysis
 
-A unified benchmark comparing Reinforcement Learning (RL) and Evolution Strategies (ES) algorithms under centralized and federated paradigms. This project includes a custom `Treasure Maze` environment, federated learning implementations, and a thorough analysis of convergence behavior, exploration efficiency, and communication overhead.
+![Python Version](https://img.shields.io/badge/python-3.10%2B-blue)![Frameworks](https://img.shields.io/badge/Frameworks-PyTorch%20%7C%20Gym-orange)![License](https.img.shields.io/badge/license-MIT-green)
+
+A unified benchmark comparing Reinforcement Learning (RL) and Evolution Strategies (ES) algorithms under both centralized and federated learning paradigms. This project introduces a custom `Treasure Maze` environment, implements various training schemes, and provides a thorough analysis of their performance.
 
 ## 🧠 Project Overview
 
-This project aims to evaluate and compare the performance of RL and ES algorithms in both centralized and federated learning settings. By introducing a standardized environment and training protocols, we provide insights into how these methods scale and adapt in decentralized contexts.
+This project aims to evaluate and compare the performance of Reinforcement Learning (RL) and Evolution Strategies (ES) in both centralized and federated settings. By introducing a standardized environment and training protocols, we provide insights into how these powerful optimization methods scale, adapt, and perform in decentralized contexts, with a special focus on privacy implications and communication overhead.
 
-## 📦 Components
+## 📦 Key Features
 
-- **Treasure Maze Environment**  
-  A 5x5 gridworld built with Gym compatibility, including:
-  - Red cells (punishment)
-  - Blue cells (reward)
-  - White cells (neutral)
-
-- **Agents**
-  - Centralized PPO
-  - Centralized DQN
-  - Centralized ES
-  - Federated PPO
-  - Federated ES
-
-- **Neural Network Architecture**
-  - 2 hidden layers
-  - 64 units per layer
-  - ReLU activations
+- **Custom Environment:** A 5x5 `Treasure Maze` gridworld built with Gym compatibility, featuring sparse rewards and punishments to test exploration capabilities.
+- **Diverse Agents:** Implementations for both RL and ES algorithms in two distinct training paradigms:
+    - **Centralized:** PPO, DQN, and a standard ES algorithm.
+    - **Federated:** Federated PPO and Federated ES, simulating decentralized training across multiple clients.
+- **Flexible Architecture:** A standardized neural network architecture (2 hidden layers, 64 units each, ReLU activations) for fair comparison across all agents.
+- **In-Depth Evaluation:** A comprehensive suite of metrics to analyze performance from multiple angles.
 
 ## 📈 Evaluation Metrics
 
-- **Convergence**  
-  Episodes required to reach maximum reward target.
+Performance is assessed based on:
 
-- **Exploration Efficiency**  
-  Average episodic return over time.
+- **Convergence Speed:** Episodes required to reach the maximum reward target.
+- **Exploration Efficiency:** Average episodic return over the course of training.
+- **Training Stability:** Standard deviation of rewards across multiple independent runs.
+- **Communication Overhead:** Number of communication rounds required in the federated setup.
+- **Privacy Considerations:** A qualitative analysis of model weight sharing (ES) versus gradient sharing (RL).
 
-- **Stability**  
-  Standard deviation across multiple training runs.
-
-- **Communication Overhead**  
-  Number of communication rounds in federated setups.
-
-- **Privacy Considerations**  
-  Comparison of model weight sharing vs. gradient sharing.
-
-## 📁 Directory Structure
-rl-es-comparative-analysis/
-│
-├── environments/
-│ └── treasure_maze.py # Custom Gym-compatible grid environment
-│
-├── centralized_rl.py # RL agent with centralized training
-├── centralized_es.py # ES agent with centralized training
-├── federated_rl.py # RL agent with federated training
-├── federated_es.py # ES agent with federated training
-│
-├── utils/
-│ ├── logger.py # Logging utilities
-│ └── federated_core.py # Federated learning utilities
-│
-├── results/
-│ └── plots/ # Learning curves and evaluation graphs
-│
-└── README.md
-
-# 🚀 Getting Started
+## 🚀 Getting Started
 
 ### Prerequisites
 
+To run this project, you will need:
 - Python 3.10+
-- Gym
-- NumPy
-- PyTorch
-- Matplotlib
+- Pip (Python package installer)
 
-Install dependencies:
-```bash
-pip install -r requirements.txt
-```
+### Installation
+
+1.  **Clone the repository:**
+    ```bash
+    git clone https://github.com/Tanmay-Somani/rl-es-comparative-analysis.git
+    cd rl-es-comparative-analysis
+    ```
+
+2.  **Create and activate a virtual environment (recommended):**
+    ```bash
+    python -m venv venv
+    source venv/bin/activate  # On Windows, use `venv\Scripts\activate`
+    ```
+
+3.  **Install the required dependencies:**
+    ```bash
+    pip install -r requirements.txt
+    ```
+
+### Running the Experiments
+
+You can run the different training scripts from the root directory:
+
+- **Train a centralized RL agent (e.g., PPO):**
+  ```bash
+  python centralized_rl.py
+  ```
