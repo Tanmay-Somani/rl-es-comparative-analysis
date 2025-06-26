@@ -62,3 +62,43 @@ You can run the different training scripts from the root directory:
   ```bash
   python centralized_rl.py
   ```
+
+### Directory Structure
+rl-es-comparative-analysis/
+│
+├── environments/
+│   └── treasure_maze.py    # Custom Gym-compatible grid environment
+│
+├── centralized_rl.py       # RL agent with centralized training
+├── centralized_es.py       # ES agent with centralized training
+├── federated_rl.py         # RL agent with federated training
+├── federated_es.py         # ES agent with federated training
+│
+├── utils/
+│   ├── logger.py           # Logging utilities
+│   └── federated_core.py   # Core logic for federated learning
+│
+├── results/
+│   └── plots/              # Learning curves and evaluation graphs
+│
+├── requirements.txt        # Project dependencies
+└── README.md```
+
+## 🤝 Contributing
+
+Contributions are welcome! If you have suggestions for improvements or want to add new algorithms, feel free to open an issue or submit a pull request.
+
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
+
+## 📄 License
+
+This project is distributed under the MIT License. See the `LICENSE` file for more information.
+
+## 🙏 Acknowledgments
+
+- This work builds upon foundational concepts from the fields of Reinforcement Learning and Evolutionary Computation.
+- A special thanks to the creators of PyTorch and OpenAI Gym for their invaluable tools.
