@@ -1,49 +1,95 @@
-import os
-import argparse
+# centralised_reinforcement_learning.py
 import numpy as np
-from tqdm import tqdm
-from stable_baselines3 import PPO
-from stable_baselines3.common.monitor import Monitor
-from stable_baselines3.common.env_util import make_vec_env
-from grid import TreasureMazeEnv
-from logs.utils import save_reward_plot, log_episode
+import random
+import time
+from grid_headless import GridEnvironment
 
-def make_env():
-    env = TreasureMazeEnv()
-    return Monitor(env)
+### --- NEW: Imports for logging and argument parsing --- ###
+import argparse
+import os
+import csv
 
-train_env = make_vec_env(make_env, n_envs=1)
-model = PPO("MlpPolicy", train_env, verbose=1)
+# --- Hyperparameters ---
+EPISODES = 2000
+LEARNING_RATE = 0.1
+DISCOUNT_FACTOR = 0.95
+EPSILON = 1.0
+EPSILON_DECAY = 0.999
+MIN_EPSILON = 0.01
 
+### --- NEW: Setup for Logging --- ###
+LOG_DIR = "logs/centralized_rl"
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
 
-log_dir = "logs/centralized_rl"
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "episode_rewards.csv")
-episode_rewards = []
+# Setup CSV logging - This will overwrite the file at the start of each run
+with open(LOG_FILE, 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(['episode', 'total_reward'])
 
+# --- Initialization ---
+env = GridEnvironment()
+# Q-table: states (6*6) x actions (4)
+q_table = np.zeros((env.grid_size, env.grid_size, env.action_space_size))
 
-TIMESTEPS = 5000
-EVAL_EPISODES = 100
-
-print("Training centralized PPO agent...")
-model.learn(total_timesteps=TIMESTEPS)
-
-eval_env = TreasureMazeEnv()
-
-print("Evaluating trained agent...")
-for episode in tqdm(range(EVAL_EPISODES), desc="Evaluating"):
-    obs, _ = eval_env.reset()
-    obs = np.array([obs], dtype=np.float32)  
+# --- Training Loop ---
+for episode in range(EPISODES):
+    state = env.reset()
     done = False
-    total_reward = 0
+    total_reward = 0 ### <-- NEW: Initialize total reward for the episode
+
     while not done:
-        action, _ = model.predict(obs, deterministic=True)
-        obs_raw, reward, done, _, _ = eval_env.step(action[0])
-        obs = np.array([obs_raw], dtype=np.float32)
-        total_reward += reward
-    episode_rewards.append(total_reward)
-    log_episode(log_file, episode, total_reward)
+        # Epsilon-greedy action selection
+        if random.uniform(0, 1) < EPSILON:
+            action = random.randint(0, env.action_space_size - 1) # Explore
+        else:
+            action = np.argmax(q_table[state]) # Exploit
 
+        new_state, reward, done = env.step(action)
+        total_reward += reward ### <-- NEW: Accumulate reward
 
-save_reward_plot(episode_rewards, filename=os.path.join(log_dir, "reward_plot.png"))
-print(f" Finished centralized RL training. Plot saved to {log_dir}/reward_plot.png")
+        # Q-learning formula
+        old_value = q_table[state][action]
+        next_max = np.max(q_table[new_state])
+        
+        new_q_value = old_value + LEARNING_RATE * (reward + DISCOUNT_FACTOR * next_max - old_value)
+        q_table[state][action] = new_q_value
+        
+        state = new_state
+
+    ### --- NEW: Log total reward after each episode --- ###
+    with open(LOG_FILE, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([episode, total_reward])
+
+    # Decay epsilon
+    if EPSILON > MIN_EPSILON:
+        EPSILON *= EPSILON_DECAY
+
+    if episode % 200 == 0:
+        print(f"Episode {episode}, Epsilon: {EPSILON:.4f}, Total Reward: {total_reward}")
+
+print("\n--- Training Complete ---")
+
+### --- MODIFIED: Final Demonstration is now conditional --- ###
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--render", action="store_true", help="Render final policy")
+    # Use parse_known_args to avoid errors if other args are passed by a master script
+    args, unknown = parser.parse_known_args()
+
+    if args.render:
+        print("\n--- Demonstration of Learned Policy ---")
+        state = env.reset()
+        done = False
+        env.render("Centralized RL - Final Path")
+        path_length = 0
+        while not done and path_length < 25: # Safety break
+            action = np.argmax(q_table[state])
+            state, _, done = env.step(action)
+            env.render("Centralized RL - Final Path")
+            path_length += 1
+            print(f"Action: {action}, Position: {state}")
+            time.sleep(0.2)
+
+        print("Demonstration finished.")

@@ -1,82 +1,139 @@
-import os
+# federated_evolution_strategies.py
 import numpy as np
-from grid import TreasureMazeEnv
-from policy import SimpleMLPPolicy
-from logs.utils import log_episode, save_reward_plot
+import random
+import time
+from grid_headless import GridEnvironment
+import copy
 
-NUM_AGENTS = 3
-ROUNDS = 100
-LOCAL_POP = 20
-SIGMA = 0.1
-LEARNING_RATE = 0.02
-LOCAL_ROUNDS = 5
-MOMENTUM = 0.2
-EPISODE_LENGTH = 50
+### --- NEW: Imports for logging and argument parsing --- ###
+import argparse
+import os
+import csv
 
-log_dir = "logs/federated_es"
-os.makedirs(log_dir, exist_ok=True)
-log_file = os.path.join(log_dir, "episode_rewards.csv")
+# --- Hyperparameters ---
+NUM_WORKERS = 4
+FEDERATED_ROUNDS = 40
+LOCAL_GENERATIONS = 5
+POPULATION_PER_WORKER = 50
+MUTATION_RATE = 0.02
+ELITISM_COUNT = 3
 
-envs = [TreasureMazeEnv(custom_layout=None) for _ in range(NUM_AGENTS)]
-input_dim = 2  
-output_dim = envs[0].action_space.n
-policies = [SimpleMLPPolicy(input_dim, output_dim) for _ in range(NUM_AGENTS)]
-flat_weights = [p.get_flat() for p in policies]
+### --- NEW: Setup for Logging --- ###
+LOG_DIR = "logs/federated_es"
+os.makedirs(LOG_DIR, exist_ok=True)
+LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
 
-def evaluate(env, flat_weights, policy, render=False):
-    policy.set_flat(flat_weights)
-    obs, _ = env.reset()
-    total_reward = 0
-    for _ in range(EPISODE_LENGTH):
-        if render:
-            env.render()
-        action = policy.act(obs, policy.params)
-        obs, reward, done, _, _ = env.step(action)
-        total_reward += reward
-        if done:
-            break
-    return total_reward
+# Setup CSV logging
+with open(LOG_FILE, 'w', newline='') as f:
+    writer = csv.writer(f)
+    writer.writerow(['round', 'global_best_fitness'])
 
-episode_rewards = []
+# --- Policy and Fitness Functions (same as centralized) ---
+def create_random_policy(env):
+    return {(r, c): random.randint(0, 3) for r in range(env.grid_size) for c in range(env.grid_size)}
 
-for rnd in range(ROUNDS):
-    print(f"\n Round {rnd+1}/{ROUNDS}")
-    new_weights = []
+def evaluate_policy(policy, env):
+    state = env.reset()
+    done = False
+    steps = 0
+    max_steps = env.grid_size * env.grid_size
+    while not done and steps < max_steps:
+        action = policy.get(state, 0)
+        state, reward, done = env.step(action)
+        steps += 1
+    final_pos, goal_pos = state, env.goal_pos
+    max_dist = (env.grid_size - 1) * 2
+    manhattan_distance = abs(final_pos[0] - goal_pos[0]) + abs(final_pos[1] - goal_pos[1])
+    fitness = (max_dist - manhattan_distance) * 10
+    if final_pos == goal_pos: fitness += 1000
+    fitness -= steps * 0.5
+    if done and final_pos != goal_pos: fitness -= 200
+    return fitness
 
-    for agent_id in range(NUM_AGENTS):
-        policy = policies[agent_id]
-        env = envs[agent_id]
-        theta = flat_weights[agent_id]
+# --- Worker Simulation ---
+class Worker:
+    def __init__(self, worker_id):
+        self.id = worker_id
+        self.env = GridEnvironment()
+        self.population = [create_random_policy(self.env) for _ in range(POPULATION_PER_WORKER)]
+        self.best_individual = None
+        self.best_fitness = -float('inf')
 
-        for local_round in range(LOCAL_ROUNDS):
-            noise = [np.random.randn(theta.size) for _ in range(LOCAL_POP)]
-            rewards = []
+    def evolve_locally(self):
+        for _ in range(LOCAL_GENERATIONS):
+            fitness_scores = sorted([(evaluate_policy(p, self.env), p) for p in self.population], key=lambda x: x[0], reverse=True)
+            elites = [p for _, p in fitness_scores[:ELITISM_COUNT]]
+            next_population = list(elites)
+            while len(next_population) < POPULATION_PER_WORKER:
+                parent = random.choice(elites)
+                child = parent.copy()
+                for state in child:
+                    if random.random() < MUTATION_RATE:
+                        child[state] = random.randint(0, 3)
+                next_population.append(child)
+            self.population = next_population
+        final_scores = sorted([(evaluate_policy(p, self.env), p) for p in self.population], key=lambda x: x[0], reverse=True)
+        self.best_fitness, self.best_individual = final_scores[0]
 
-            for eps in noise:
-                test_weights = theta + SIGMA * eps
-                reward = evaluate(env, test_weights, policy)
-                rewards.append(reward)
+    def incorporate_champions(self, champions):
+        self.population.sort(key=lambda p: evaluate_policy(p, self.env))
+        num_to_replace = min(len(champions), len(self.population) // 4)
+        for i in range(num_to_replace):
+            self.population[i] = copy.deepcopy(random.choice(champions))
 
-            rewards = np.array(rewards)
-            if np.std(rewards) > 1e-6:
-                A = (rewards - np.mean(rewards)) / (np.std(rewards) + 1e-8)
-            else:
-                A = rewards - np.mean(rewards)
+# --- Federated Evolution Loop ---
+workers = [Worker(i) for i in range(NUM_WORKERS)]
+global_best_policy = None
+global_best_fitness = -float('inf')
 
-            update = sum(A[i] * noise[i] for i in range(LOCAL_POP))
-            theta += LEARNING_RATE / (LOCAL_POP * SIGMA) * update
+for round_num in range(FEDERATED_ROUNDS):
+    print(f"--- Round {round_num+1}/{FEDERATED_ROUNDS} ---")
+    champions = []
+    round_best_fitness = -float('inf')
 
-        new_weights.append(theta)
+    for worker in workers:
+        print(f"Worker {worker.id} evolving locally...")
+        worker.evolve_locally()
+        champions.append(worker.best_individual)
+        
+        if worker.best_fitness > global_best_fitness:
+            global_best_fitness = worker.best_fitness
+            global_best_policy = copy.deepcopy(worker.best_individual)
+            print(f"** New Global Best Fitness: {global_best_fitness:.2f} (from Worker {worker.id}) **")
+    
+    ### --- NEW: Log the best fitness found in this round --- ###
+    with open(LOG_FILE, 'a', newline='') as f:
+        writer = csv.writer(f)
+        writer.writerow([round_num, global_best_fitness])
 
-    avg_weights = sum(new_weights) / NUM_AGENTS
-    for i in range(NUM_AGENTS):
-        flat_weights[i] = (1 - MOMENTUM) * flat_weights[i] + MOMENTUM * avg_weights
+    print("Sharing champions among workers...")
+    for worker in workers:
+        other_champions = [c for c in champions if c is not worker.best_individual]
+        if other_champions:
+            worker.incorporate_champions(other_champions)
 
-    test_policy = SimpleMLPPolicy(input_dim, output_dim)
-    reward = evaluate(TreasureMazeEnv(), avg_weights, test_policy)
-    log_episode(log_file, rnd, reward)
-    episode_rewards.append(reward)
-    print(f" Eval reward: {reward:.2f}")
+print("\n--- Federated Evolution Complete ---")
 
-save_reward_plot(episode_rewards, os.path.join(log_dir, "reward_plot.png"))
-print(f"\n Done! Logs and plot saved to: {log_dir}")
+### --- MODIFIED: Final Demonstration is now conditional --- ###
+if __name__ == "__main__":
+    parser = argparse.ArgumentParser()
+    parser.add_argument("--render", action="store_true", help="Render final policy")
+    args, unknown = parser.parse_known_args()
+
+    if args.render and global_best_policy:
+        print("\n--- Demonstration of the Best Policy Found Globally ---")
+        env = GridEnvironment()
+        state = env.reset()
+        done = False
+        env.render("Federated ES - Final Path")
+        path_length = 0
+        while not done and path_length < 25:
+            action = global_best_policy[state]
+            state, _, done = env.step(action)
+            env.render("Federated ES - Final Path")
+            path_length += 1
+            print(f"Position: {state}")
+            time.sleep(0.2)
+        print("Demonstration finished.")
+    elif args.render:
+        print("Rendering skipped because no valid global policy was found.")
