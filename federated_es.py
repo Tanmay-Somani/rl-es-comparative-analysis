@@ -7,25 +7,37 @@ import copy
 import argparse
 import os
 import csv
-import pickle ### NEW: Import pickle for saving the model
+import pickle
 
 # --- Hyperparameters ---
 NUM_WORKERS = 4
-FEDERATED_ROUNDS = 100
+FEDERATED_ROUNDS = 300
 LOCAL_GENERATIONS = 5
 POPULATION_PER_WORKER = 50
-MUTATION_RATE = 0.02
+MUTATION_RATE = 0.05
 ELITISM_COUNT = 3
-start_time = time.time()
+TOURNAMENT_SIZE = 5
+
+# --- Argument Parsing for Dynamic Logging ---
+parser = argparse.ArgumentParser()
+parser.add_argument("--log_file", type=str, help="Path to save the training log CSV.")
+parser.add_argument("--render", action="store_true", help="Render final policy.")
+args, unknown = parser.parse_known_args()
+
 # --- Setup for Logging ---
-LOG_DIR = "logs/federated_es"
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
+if args.log_file:
+    LOG_FILE = args.log_file
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+else:
+    LOG_DIR = "logs/federated_es"
+    os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
+
 with open(LOG_FILE, 'w', newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(['round', 'global_best_fitness','elapsed_time'])
+    writer.writerow(['round', 'global_best_fitness', 'elapsed_time'])
 
-# --- Policy and Fitness Functions (same as centralized) ---
+# --- Policy and Fitness Functions (same as centralized for fair comparison) ---
 def create_random_policy(env):
     return {(r, c): random.randint(0, 3) for r in range(env.grid_size) for c in range(env.grid_size)}
 
@@ -33,26 +45,25 @@ def evaluate_policy(policy, env):
     state = env.reset()
     done = False
     steps = 0
-    max_steps = env.grid_size * env.grid_size
+    max_steps = env.grid_size * env.grid_size * 1.5
     while not done and steps < max_steps:
         action = policy.get(state, 0)
         state, reward, done = env.step(action)
         steps += 1
-    final_pos, goal_pos = state, env.goal_pos
-    max_dist = (env.grid_size - 1) * 2
-    manhattan_distance = abs(final_pos[0] - goal_pos[0]) + abs(final_pos[1] - goal_pos[1])
-    fitness = (max_dist - manhattan_distance) * 10
-    if final_pos == goal_pos: fitness += 1000
-    fitness -= steps * 0.5
-    if done and final_pos != goal_pos: fitness -= 200
-    return fitness
+    
+    if state == env.goal_pos:
+        return 1000.0 + (max_steps - steps) * 2
+    else:
+        final_pos, goal_pos = state, env.goal_pos
+        manhattan_distance = abs(final_pos[0] - goal_pos[0]) + abs(final_pos[1] - goal_pos[1])
+        fitness = -manhattan_distance * 10
+        if done: fitness -= 500
+        return fitness
 
 # --- Worker Simulation ---
-### MODIFIED: Worker now accepts an environment configuration ###
 class Worker:
     def __init__(self, worker_id, env_config):
         self.id = worker_id
-        # Each worker gets its own env instance but configured identically
         self.env = GridEnvironment()
         self.env.set_config(env_config)
         self.population = [create_random_policy(self.env) for _ in range(POPULATION_PER_WORKER)]
@@ -65,7 +76,7 @@ class Worker:
             elites = [p for _, p in fitness_scores[:ELITISM_COUNT]]
             next_population = list(elites)
             while len(next_population) < POPULATION_PER_WORKER:
-                parent = random.choice(elites)
+                parent = max(random.sample(fitness_scores, TOURNAMENT_SIZE), key=lambda x: x[0])[1]
                 child = parent.copy()
                 for state in child:
                     if random.random() < MUTATION_RATE:
@@ -82,28 +93,25 @@ class Worker:
             self.population[i] = copy.deepcopy(random.choice(champions))
 
 # --- Federated Evolution Loop ---
-### NEW: Create a single master environment for the run ###
 master_env = GridEnvironment()
 master_env_config = master_env.get_config()
-
-### MODIFIED: Initialize workers with the same environment config ###
 workers = [Worker(i, master_env_config) for i in range(NUM_WORKERS)]
 global_best_policy = None
 global_best_fitness = -float('inf')
+start_time = time.time()
 
 for round_num in range(FEDERATED_ROUNDS):
     print(f"--- Round {round_num+1}/{FEDERATED_ROUNDS} ---")
     champions = []
-
     for worker in workers:
         worker.evolve_locally()
         champions.append(worker.best_individual)
-        
         if worker.best_fitness > global_best_fitness:
             global_best_fitness = worker.best_fitness
             global_best_policy = copy.deepcopy(worker.best_individual)
             print(f"** New Global Best Fitness: {global_best_fitness:.2f} (from Worker {worker.id}) **")
-    elapsed_time = time.time() - start_time  # Update elapsed time
+    
+    elapsed_time = time.time() - start_time
     with open(LOG_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
         writer.writerow([round_num, global_best_fitness, elapsed_time])
@@ -115,42 +123,26 @@ for round_num in range(FEDERATED_ROUNDS):
 
 print("\n--- Federated Evolution Complete ---")
 
-### NEW: Save the best global policy and the environment it was trained on ###
 if global_best_policy:
     MODEL_DIR = "trained_models"
     os.makedirs(MODEL_DIR, exist_ok=True)
-    model_data = {
-        'model': global_best_policy,
-        'env_config': master_env_config
-    }
+    model_data = {'model': global_best_policy, 'env_config': master_env_config}
     model_path = os.path.join(MODEL_DIR, "federated_es.pkl")
     with open(model_path, 'wb') as f:
         pickle.dump(model_data, f)
     print(f"Best global policy saved to {model_path}")
 
-
-### MODIFIED: Final Demonstration uses the master environment ###
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--render", action="store_true", help="Render final policy")
-    args, unknown = parser.parse_known_args()
-
-    if args.render and global_best_policy:
-        print("\n--- Demonstration of the Best Policy Found Globally ---")
-        # Use the same environment configuration that the model was trained on
-        env = GridEnvironment()
-        env.set_config(master_env_config)
-        state = env.reset()
-        done = False
+if args.render and global_best_policy:
+    print("\n--- Demonstration of the Best Policy Found Globally ---")
+    env = GridEnvironment()
+    env.set_config(master_env_config)
+    state = env.reset()
+    done = False
+    env.render("Federated ES - Final Path")
+    for _ in range(50):
+        if done: break
+        action = global_best_policy.get(state,0)
+        state, _, done = env.step(action)
         env.render("Federated ES - Final Path")
-        path_length = 0
-        while not done and path_length < 25:
-            action = global_best_policy[state]
-            state, _, done = env.step(action)
-            env.render("Federated ES - Final Path")
-            path_length += 1
-            print(f"Position: {state}")
-            time.sleep(0.2)
-        print("Demonstration finished.")
-    elif args.render:
-        print("Rendering skipped because no valid global policy was found.")
+        time.sleep(0.2)
+    print("Demonstration finished.")

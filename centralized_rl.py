@@ -6,28 +6,41 @@ from grid_headless import GridEnvironment
 import argparse
 import os
 import csv
-import pickle ### NEW: Import pickle for saving the model
+import pickle
+from collections import deque
 
 # --- Hyperparameters ---
-EPISODES = 100
-LEARNING_RATE = 0.1
-DISCOUNT_FACTOR = 0.95
+EPISODES = 300 
+LEARNING_RATE = 0.2
+DISCOUNT_FACTOR = 0.8
 EPSILON = 1.0
-EPSILON_DECAY = 0.999
-MIN_EPSILON = 0.01
+EPSILON_DECAY = 0.995 
+MIN_EPSILON = 0.02
+
+# --- Argument Parsing for Dynamic Logging ---
+parser = argparse.ArgumentParser()
+parser.add_argument("--log_file", type=str, help="Path to save the training log CSV.")
+parser.add_argument("--render", action="store_true", help="Render final policy.")
+args, unknown = parser.parse_known_args()
 
 # --- Setup for Logging ---
-LOG_DIR = "logs/centralized_rl"
-os.makedirs(LOG_DIR, exist_ok=True)
-LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
+if args.log_file:
+    LOG_FILE = args.log_file
+    os.makedirs(os.path.dirname(LOG_FILE), exist_ok=True)
+else:
+    LOG_DIR = "logs/centralized_rl"
+    os.makedirs(LOG_DIR, exist_ok=True)
+    LOG_FILE = os.path.join(LOG_DIR, "training_log.csv")
 
 with open(LOG_FILE, 'w', newline='') as f:
     writer = csv.writer(f)
-    writer.writerow(['episode', 'total_reward','elapsed_time'])
+    writer.writerow(['episode', 'total_reward', 'elapsed_time'])
 
 # --- Initialization ---
-env = GridEnvironment() # Creates a single, randomized environment for this entire run
+env = GridEnvironment() 
 q_table = np.zeros((env.grid_size, env.grid_size, env.action_space_size))
+latest_rewards = deque(maxlen=100)
+solved_threshold = 85 
 start_time = time.time()
 
 # --- Training Loop ---
@@ -35,66 +48,59 @@ for episode in range(EPISODES):
     state = env.reset()
     done = False
     total_reward = 0
-
-    while not done:
+    steps = 0
+    while not done and steps < 100:
         if random.uniform(0, 1) < EPSILON:
             action = random.randint(0, env.action_space_size - 1)
         else:
             action = np.argmax(q_table[state])
-
         new_state, reward, done = env.step(action)
         total_reward += reward
-
+        steps += 1
         old_value = q_table[state][action]
         next_max = np.max(q_table[new_state])
-        
         new_q_value = old_value + LEARNING_RATE * (reward + DISCOUNT_FACTOR * next_max - old_value)
         q_table[state][action] = new_q_value
-        
         state = new_state
+
     elapsed_time = time.time() - start_time
     with open(LOG_FILE, 'a', newline='') as f:
         writer = csv.writer(f)
-        writer.writerow([episode, total_reward,elapsed_time])
+        writer.writerow([episode, total_reward, elapsed_time])
 
+    latest_rewards.append(total_reward)
     if EPSILON > MIN_EPSILON:
         EPSILON *= EPSILON_DECAY
 
-    if episode % 200 == 0:
-        print(f"Episode {episode}, Epsilon: {EPSILON:.4f}, Total Reward: {total_reward}")
+    if episode % 500 == 0:
+        avg_reward = sum(latest_rewards) / len(latest_rewards)
+        print(f"Episode {episode}/{EPISODES} | Epsilon: {EPSILON:.4f} | Avg Reward (last 100): {avg_reward:.2f}")
+
+    if len(latest_rewards) == 100:
+        average_reward_100 = sum(latest_rewards) / 100
+        if average_reward_100 >= solved_threshold:
+            print(f"\nEnvironment solved in {episode} episodes!")
+            break
 
 print("\n--- Training Complete ---")
 
-### NEW: Save the final Q-table and the environment it was trained on ###
 MODEL_DIR = "trained_models"
 os.makedirs(MODEL_DIR, exist_ok=True)
-model_data = {
-    'model': q_table,
-    'env_config': env.get_config()
-}
+model_data = {'model': q_table, 'env_config': env.get_config()}
 model_path = os.path.join(MODEL_DIR, "centralized_rl.pkl")
 with open(model_path, 'wb') as f:
     pickle.dump(model_data, f)
 print(f"Q-table saved to {model_path}")
 
-
-### MODIFIED: Final Demonstration is now conditional --- ###
-if __name__ == "__main__":
-    parser = argparse.ArgumentParser()
-    parser.add_argument("--render", action="store_true", help="Render final policy")
-    args, unknown = parser.parse_known_args()
-
-    if args.render:
-        print("\n--- Demonstration of Learned Policy ---")
-        state = env.reset()
-        done = False
+if args.render:
+    print("\n--- Demonstration of Learned Policy ---")
+    state = env.reset()
+    done = False
+    env.render("Centralized RL - Final Path")
+    for _ in range(30):
+        if done: break
+        action = np.argmax(q_table[state])
+        state, _, done = env.step(action)
         env.render("Centralized RL - Final Path")
-        path_length = 0
-        while not done and path_length < 25:
-            action = np.argmax(q_table[state])
-            state, _, done = env.step(action)
-            env.render("Centralized RL - Final Path")
-            path_length += 1
-            print(f"Action: {action}, Position: {state}")
-            time.sleep(0.2)
-        print("Demonstration finished.")
+        time.sleep(0.2)
+    print("Demonstration finished.")
