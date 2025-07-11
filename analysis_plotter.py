@@ -5,6 +5,7 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import seaborn as sns
 from glob import glob
+import numpy as np
 
 # --- Configuration ---
 LOGS_DIR = "logs"
@@ -35,7 +36,6 @@ def generate_single_report(log_file_path, experiment_name):
         ax.set_xlabel(x_axis_label.replace('_', ' ').title(), fontsize=12)
         ax.set_ylabel(y_axis_label.replace('_', ' ').title(), fontsize=12)
         plot_path = os.path.join(single_results_dir, f"{experiment_name}_performance.png")
-        # MODIFIED: Added plt.tight_layout() for robust fitting
         plt.tight_layout()
         plt.savefig(plot_path, dpi=150, bbox_inches='tight')
         plt.close(fig)
@@ -65,17 +65,14 @@ def generate_robustness_reports(all_data_runs):
     
     for name, df_list in all_data_runs.items():
         if not df_list: continue
-        # Concatenate runs with a new 'run' key for seaborn
         for i, df in enumerate(df_list):
             df['run'] = i
         
         all_runs_df = pd.concat(df_list)
         x_col, y_col = all_runs_df.columns[0], all_runs_df.columns[1]
 
-        # Plot confidence interval directly using seaborn
         sns.lineplot(data=all_runs_df, x=x_col, y=y_col, label=name.replace('_', ' ').title(), errorbar='sd')
 
-        # Collect final scores for box plot
         for df in df_list:
             final_score = df[y_col].tail(len(df) // 20).mean()
             final_scores.append({'Method': name.replace('_', ' ').title(), 'Final Score': final_score})
@@ -84,11 +81,9 @@ def generate_robustness_reports(all_data_runs):
     plt.xlabel('Training Iteration', fontsize=14)
     plt.ylabel('Performance Metric (Non-normalized)', fontsize=14)
     plt.legend(fontsize=12); plt.grid(True, which='both', linestyle='--'); plt.tight_layout()
-    # MODIFIED: Added bbox_inches='tight' for robust saving
     plt.savefig(os.path.join(robustness_results_dir, "robustness_confidence_interval.png"), dpi=150, bbox_inches='tight')
     plt.close()
 
-    # Box Plot of Final Performance
     if final_scores:
         final_scores_df = pd.DataFrame(final_scores)
         plt.figure(figsize=(12, 7))
@@ -97,7 +92,6 @@ def generate_robustness_reports(all_data_runs):
         plt.title('Distribution of Final Performance Across Multiple Runs', fontsize=18, weight='bold')
         plt.xlabel('Final Performance Score', fontsize=14); plt.ylabel('')
         plt.tight_layout()
-        # MODIFIED: Added bbox_inches='tight' for robust saving
         plt.savefig(os.path.join(robustness_results_dir, "robustness_final_performance_boxplot.png"), dpi=150, bbox_inches='tight')
         plt.close()
 
@@ -115,29 +109,59 @@ def generate_comparison_plots(all_data):
     plt.title('Communication Cost: Performance vs. Wall-Clock Time', fontsize=18, weight='bold')
     plt.xlabel('Wall-Clock Time (seconds)', fontsize=14); plt.ylabel('Normalized Performance (0 to 1)', fontsize=14)
     plt.legend(fontsize=12); plt.grid(True); plt.tight_layout()
-    # MODIFIED: Added bbox_inches='tight' for robust saving
     plt.savefig(os.path.join(comparison_results_dir, "comparison_time.png"), dpi=150, bbox_inches='tight'); plt.close()
 
-    # Plot 2: Privacy Trade-off Scatter Plot
     summary_data = []
     for name, df in all_data.items():
         try:
             privacy_score = 1.0 if "federated" in name else 0.0
             final_performance = df['normalized_performance'].tail(len(df) // 10).mean()
-            time_to_converge = df[df['normalized_performance'] >= 0.8].iloc[0]['elapsed_time'] if not df[df['normalized_performance'] >= 0.8].empty else float('nan')
+            converged = df[df['normalized_performance'] >= 0.8]
+            time_to_converge = converged.iloc[0]['elapsed_time'] if not converged.empty else np.nan
             summary_data.append({'Method': name.replace('_', ' ').title(), 'Architecture': 'Federated' if privacy_score else 'Centralized', 'Algorithm': 'ES' if 'es' in name else 'RL', 'Final Performance': final_performance, 'Time to Converge (s)': time_to_converge})
         except Exception: continue
     
     if summary_data:
         summary_df = pd.DataFrame(summary_data)
+        
+        # Plot 2: Privacy Trade-off Scatter Plot
         plt.figure(figsize=(12, 8))
         sns.scatterplot(data=summary_df, x='Final Performance', y='Time to Converge (s)', hue='Architecture', style='Algorithm', s=200, palette={'Centralized': 'crimson', 'Federated': 'royalblue'}, edgecolor='black')
         for i in range(summary_df.shape[0]):
             plt.text(x=summary_df['Final Performance'][i]+0.01, y=summary_df['Time to Converge (s)'][i], s=summary_df['Method'][i])
         plt.title('Performance vs. Efficiency: The Cost of Privacy', fontsize=18, weight='bold'); plt.xlabel('Final Model Performance', fontsize=14); plt.ylabel('Time to Reach 80% Performance (s)', fontsize=14)
         plt.legend(title='Architecture / Algorithm', fontsize=12); plt.tight_layout()
-        # MODIFIED: Added bbox_inches='tight' for robust saving
         plt.savefig(os.path.join(comparison_results_dir, "summary_privacy_tradeoff.png"), dpi=150, bbox_inches='tight'); plt.close()
+
+        # MODIFIED: Added unified efficiency plot
+        # Plot 3: Unified Efficiency Comparison (Bar Chart)
+        # Handle missing convergence times with a default benchmark
+        valid_times = summary_df['Time to Converge (s)'].dropna()
+        max_time = valid_times.max() if not valid_times.empty else 1000 # Default max if no data
+        # Set benchmark for non-converged methods to be 10% higher than the max observed time
+        benchmark_time = max_time * 1.1 
+        summary_df['Time to Converge (s)'].fillna(benchmark_time, inplace=True)
+        summary_df = summary_df.sort_values('Time to Converge (s)', ascending=False)
+        
+        plt.figure(figsize=(12, 8))
+        palette = ['royalblue' if 'Federated' in arch else 'crimson' for arch in summary_df['Architecture']]
+        barplot = sns.barplot(x='Time to Converge (s)', y='Method', data=summary_df, palette=palette, orient='h')
+        
+        # Add text labels to bars
+        for index, value in enumerate(summary_df['Time to Converge (s)']):
+            # Check if the value is the benchmark to add an annotation
+            if value == benchmark_time:
+                plt.text(value, index, f'  {value:.1f} (NC*)', va='center', ha='left', style='italic')
+            else:
+                plt.text(value, index, f'  {value:.1f} s', va='center', ha='left')
+
+        plt.title('Unified Efficiency Comparison', fontsize=18, weight='bold')
+        plt.xlabel('Time to Reach 80% Performance (seconds)\n*NC: Did not converge to threshold.', fontsize=14)
+        plt.ylabel('')
+        plt.xlim(0, benchmark_time * 1.1) # Set x-limit for better visualization
+        plt.tight_layout()
+        plt.savefig(os.path.join(comparison_results_dir, "comparison_efficiency_unified.png"), dpi=150, bbox_inches='tight'); plt.close()
+
 
 def main():
     parser = argparse.ArgumentParser(description="Grid World Experiment Analysis Tool", formatter_class=argparse.RawTextHelpFormatter)
