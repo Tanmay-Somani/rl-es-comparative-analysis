@@ -323,86 +323,42 @@ Run the project with:
 python {entrypoint}
 ```
 
-### Testing
+### Directory Structure
+rl-es-comparative-analysis/
+│
+├── environments/
+│   └── treasure_maze.py    # Custom Gym-compatible grid environment
+│
+├── centralized_rl.py       # RL agent with centralized training
+├── centralized_es.py       # ES agent with centralized training
+├── federated_rl.py         # RL agent with federated training
+├── federated_es.py         # ES agent with federated training
+│
+├── utils/
+│   ├── logger.py           # Logging utilities
+│   └── federated_core.py   # Core logic for federated learning
+│
+├── results/
+│   └── plots/              # Learning curves and evaluation graphs
+│
+├── requirements.txt        # Project dependencies
+└── README.md```
 
-Rl-es-comparative-analysis uses the {__test_framework__} test framework. Run the test suite with:
+## 🤝 Contributing
 
-**Using [pip](https://pypi.org/project/pip/):**
-```sh
-pytest
-```
+Contributions are welcome! If you have suggestions for improvements or want to add new algorithms, feel free to open an issue or submit a pull request.
 
----
+1.  Fork the Project
+2.  Create your Feature Branch (`git checkout -b feature/AmazingFeature`)
+3.  Commit your Changes (`git commit -m 'Add some AmazingFeature'`)
+4.  Push to the Branch (`git push origin feature/AmazingFeature`)
+5.  Open a Pull Request
 
-## Roadmap
+## 📄 License
 
-- [X] **`Task 1`**: <strike>Implement feature one.</strike>
-- [ ] **`Task 2`**: Implement feature two.
-- [ ] **`Task 3`**: Implement feature three.
+This project is distributed under the MIT License. See the `LICENSE` file for more information.
 
----
+## 🙏 Acknowledgments
 
-## Contributing
-
-- **💬 [Join the Discussions](https://LOCAL/Research_Paper/rl-es-comparative-analysis/discussions)**: Share your insights, provide feedback, or ask questions.
-- **🐛 [Report Issues](https://LOCAL/Research_Paper/rl-es-comparative-analysis/issues)**: Submit bugs found or log feature requests for the `rl-es-comparative-analysis` project.
-- **💡 [Submit Pull Requests](https://LOCAL/Research_Paper/rl-es-comparative-analysis/blob/main/CONTRIBUTING.md)**: Review open PRs, and submit your own PRs.
-
-<details closed>
-<summary>Contributing Guidelines</summary>
-
-1. **Fork the Repository**: Start by forking the project repository to your LOCAL account.
-2. **Clone Locally**: Clone the forked repository to your local machine using a git client.
-   ```sh
-   git clone C:\Users\Tanmay Somani\OneDrive\Desktop\Career\Research_Paper\rl-es-comparative-analysis
-   ```
-3. **Create a New Branch**: Always work on a new branch, giving it a descriptive name.
-   ```sh
-   git checkout -b new-feature-x
-   ```
-4. **Make Your Changes**: Develop and test your changes locally.
-5. **Commit Your Changes**: Commit with a clear message describing your updates.
-   ```sh
-   git commit -m 'Implemented new feature x.'
-   ```
-6. **Push to LOCAL**: Push the changes to your forked repository.
-   ```sh
-   git push origin new-feature-x
-   ```
-7. **Submit a Pull Request**: Create a PR against the original project repository. Clearly describe the changes and their motivations.
-8. **Review**: Once your PR is reviewed and approved, it will be merged into the main branch. Congratulations on your contribution!
-</details>
-
-<details closed>
-<summary>Contributor Graph</summary>
-<br>
-<p align="left">
-   <a href="https://LOCAL{/Research_Paper/rl-es-comparative-analysis/}graphs/contributors">
-      <img src="https://contrib.rocks/image?repo=Research_Paper/rl-es-comparative-analysis">
-   </a>
-</p>
-</details>
-
----
-
-## License
-
-Rl-es-comparative-analysis is protected under the [LICENSE](https://choosealicense.com/licenses) License. For more details, refer to the [LICENSE](https://choosealicense.com/licenses/) file.
-
----
-
-## Acknowledgments
-
-- Credit `contributors`, `inspiration`, `references`, etc.
-
-<div align="right">
-
-[![][back-to-top]](#top)
-
-</div>
-
-
-[back-to-top]: https://img.shields.io/badge/-BACK_TO_TOP-151515?style=flat-square
-
-
----
+- This work builds upon foundational concepts from the fields of Reinforcement Learning and Evolutionary Computation.
+- A special thanks to the creators of PyTorch and OpenAI Gym for their invaluable tools.
