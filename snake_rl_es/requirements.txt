@@ -1,0 +1,9 @@
+
+pygame
+numpy
+tensorflow
+pandas
+matplotlib
+seaborn
+psutil
+tqdm
