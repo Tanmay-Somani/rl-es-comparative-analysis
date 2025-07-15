@@ -9,13 +9,15 @@ class RLAgent:
     """A client in the federated learning setup for CartPole."""
     def __init__(self, env):
         # Discretize the state space for the Q-table
-        self.pos_bins = np.linspace(-4.8, 4.8, 10)  # Cart position
-        self.vel_bins = np.linspace(-10, 10, 10)    # Cart velocity  
-        self.angle_bins = np.linspace(-0.418, 0.418, 10)  # Pole angle (in radians)
-        self.ang_vel_bins = np.linspace(-10, 10, 10)      # Pole angular velocity
-        
-        self.q_table = np.zeros((len(self.pos_bins), len(self.vel_bins), 
-                                len(self.angle_bins), len(self.ang_vel_bins), env.action_space.n))
+        self.epsilon = 0.1
+        self.pos_bins = np.linspace(-2.4, 2.4, 10)  # Cart position
+        self.vel_bins = np.linspace(-5, 5, 10)    # Cart velocity  
+        self.angle_bins = np.linspace(-0.2095, 0.2095, 10)  # Pole angle (in radians)
+        self.ang_vel_bins = np.linspace(-5, 5, 10)      # Pole angular velocity
+
+        self.q_table = np.zeros((len(self.pos_bins)+1, len(self.vel_bins)+1, 
+                                len(self.angle_bins)+1, len(self.ang_vel_bins)+1, env.action_space.n))
+
         self.learning_rate = 0.1
         self.discount_factor = 0.95
 
@@ -25,34 +27,38 @@ class RLAgent:
             state, _ = env.reset()
             
             # Discretize state
-            state_p = np.digitize(state[0], self.pos_bins) - 1
-            state_v = np.digitize(state[1], self.vel_bins) - 1
-            state_a = np.digitize(state[2], self.angle_bins) - 1
-            state_av = np.digitize(state[3], self.ang_vel_bins) - 1
+            state_p = np.digitize(state[0], self.pos_bins) 
+            state_v = np.digitize(state[1], self.vel_bins) 
+            state_a = np.digitize(state[2], self.angle_bins) 
+            state_av = np.digitize(state[3], self.ang_vel_bins) 
             
             # Clamp to valid indices
-            state_p = max(0, min(state_p, len(self.pos_bins) - 1))
-            state_v = max(0, min(state_v, len(self.vel_bins) - 1))
-            state_a = max(0, min(state_a, len(self.angle_bins) - 1))
-            state_av = max(0, min(state_av, len(self.ang_vel_bins) - 1))
+            state_p = max(0, min(state_p, len(self.pos_bins) ))
+            state_v = max(0, min(state_v, len(self.vel_bins) ))
+            state_a = max(0, min(state_a, len(self.angle_bins) ))
+            state_av = max(0, min(state_av, len(self.ang_vel_bins) ))
             
             terminated, truncated = False, False
             while not (terminated or truncated):
                 # For local training, we assume the client uses its current policy
-                action = np.argmax(self.q_table[state_p, state_v, state_a, state_av, :])
+                # CORRECT (epsilon-greedy exploration)
+                if np.random.random() < self.epsilon:  # Add epsilon parameter
+                    action = env.action_space.sample()  # Random action
+                else:
+                    action = np.argmax(self.q_table[state_p, state_v, state_a, state_av, :])
                 new_state, reward, terminated, truncated, _ = env.step(action)
                 
                 # Discretize new state
-                new_state_p = np.digitize(new_state[0], self.pos_bins) - 1
-                new_state_v = np.digitize(new_state[1], self.vel_bins) - 1
-                new_state_a = np.digitize(new_state[2], self.angle_bins) - 1
-                new_state_av = np.digitize(new_state[3], self.ang_vel_bins) - 1
+                new_state_p = np.digitize(new_state[0], self.pos_bins) 
+                new_state_v = np.digitize(new_state[1], self.vel_bins) 
+                new_state_a = np.digitize(new_state[2], self.angle_bins) 
+                new_state_av = np.digitize(new_state[3], self.ang_vel_bins) 
                 
                 # Clamp to valid indices
-                new_state_p = max(0, min(new_state_p, len(self.pos_bins) - 1))
-                new_state_v = max(0, min(new_state_v, len(self.vel_bins) - 1))
-                new_state_a = max(0, min(new_state_a, len(self.angle_bins) - 1))
-                new_state_av = max(0, min(new_state_av, len(self.ang_vel_bins) - 1))
+                new_state_p = max(0, min(new_state_p, len(self.pos_bins) ))
+                new_state_v = max(0, min(new_state_v, len(self.vel_bins) ))
+                new_state_a = max(0, min(new_state_a, len(self.angle_bins) ))
+                new_state_av = max(0, min(new_state_av, len(self.ang_vel_bins) ))
                 
                 # Q-table update
                 self.q_table[state_p, state_v, state_a, state_av, action] = \
@@ -94,16 +100,16 @@ def run_fl_rl(log_data, n_clients=5, n_rounds=500, local_epochs=5):
             terminated, truncated = False, False
             while not (terminated or truncated):
                 # Discretize state
-                state_p = np.digitize(state[0], clients[0].pos_bins) - 1
-                state_v = np.digitize(state[1], clients[0].vel_bins) - 1
-                state_a = np.digitize(state[2], clients[0].angle_bins) - 1
-                state_av = np.digitize(state[3], clients[0].ang_vel_bins) - 1
+                state_p = np.digitize(state[0], clients[0].pos_bins) 
+                state_v = np.digitize(state[1], clients[0].vel_bins) 
+                state_a = np.digitize(state[2], clients[0].angle_bins) 
+                state_av = np.digitize(state[3], clients[0].ang_vel_bins) 
                 
                 # Clamp to valid indices
-                state_p = max(0, min(state_p, len(clients[0].pos_bins) - 1))
-                state_v = max(0, min(state_v, len(clients[0].vel_bins) - 1))
-                state_a = max(0, min(state_a, len(clients[0].angle_bins) - 1))
-                state_av = max(0, min(state_av, len(clients[0].ang_vel_bins) - 1))
+                state_p = max(0, min(state_p, len(clients[0].pos_bins) ))
+                state_v = max(0, min(state_v, len(clients[0].vel_bins) ))
+                state_a = max(0, min(state_a, len(clients[0].angle_bins) ))
+                state_av = max(0, min(state_av, len(clients[0].ang_vel_bins) ))
                 
                 action = np.argmax(global_model[state_p, state_v, state_a, state_av, :])
                 state, reward, terminated, truncated, _ = env.step(action)

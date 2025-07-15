@@ -16,13 +16,12 @@ def run_rl_non_fl(log_data):
 
     # Discretize the state space for the Q-table
     # CartPole has 4 continuous state variables: [cart_position, cart_velocity, pole_angle, pole_angular_velocity]
-    pos_bins = np.linspace(-4.8, 4.8, 10)  # Cart position
-    vel_bins = np.linspace(-10, 10, 10)    # Cart velocity  
-    angle_bins = np.linspace(-0.418, 0.418, 10)  # Pole angle (in radians)
-    ang_vel_bins = np.linspace(-10, 10, 10)      # Pole angular velocity
+    pos_bins = np.linspace(-2.4, 2.4, 10)   # Cart position
+    vel_bins = np.linspace(-5, 5, 10)    # Cart velocity  
+    angle_bins = np.linspace(-0.2095, 0.2095, 10)  # Pole angle (in radians)
+    ang_vel_bins = np.linspace(-5, 5, 10)       # Pole angular velocity
     
-    q_table = np.zeros((len(pos_bins), len(vel_bins), len(angle_bins), len(ang_vel_bins), env.action_space.n))
-
+    q_table = np.zeros((len(pos_bins)+1, len(vel_bins)+1, len(angle_bins)+1, len(ang_vel_bins)+1, env.action_space.n))
     # Hyperparameters
     learning_rate = 0.1
     discount_factor = 0.95
@@ -35,16 +34,16 @@ def run_rl_non_fl(log_data):
         state, _ = env.reset()
         
         # Discretize state
-        state_p = np.digitize(state[0], pos_bins) - 1
-        state_v = np.digitize(state[1], vel_bins) - 1
-        state_a = np.digitize(state[2], angle_bins) - 1
-        state_av = np.digitize(state[3], ang_vel_bins) - 1
+        state_p = np.digitize(state[0], pos_bins)
+        state_v = np.digitize(state[1], vel_bins) 
+        state_a = np.digitize(state[2], angle_bins) 
+        state_av = np.digitize(state[3], ang_vel_bins) 
         
         # Clamp to valid indices
-        state_p = max(0, min(state_p, len(pos_bins) - 1))
-        state_v = max(0, min(state_v, len(vel_bins) - 1))
-        state_a = max(0, min(state_a, len(angle_bins) - 1))
-        state_av = max(0, min(state_av, len(ang_vel_bins) - 1))
+        state_p = max(0, min(state_p, len(pos_bins) ))
+        state_v = max(0, min(state_v, len(vel_bins) ))
+        state_a = max(0, min(state_a, len(angle_bins) ))
+        state_av = max(0, min(state_av, len(ang_vel_bins) ))
         
         terminated = False
         truncated = False
@@ -60,16 +59,16 @@ def run_rl_non_fl(log_data):
             new_state, reward, terminated, truncated, _ = env.step(action)
             
             # Discretize new state
-            new_state_p = np.digitize(new_state[0], pos_bins) - 1
-            new_state_v = np.digitize(new_state[1], vel_bins) - 1
-            new_state_a = np.digitize(new_state[2], angle_bins) - 1
-            new_state_av = np.digitize(new_state[3], ang_vel_bins) - 1
+            new_state_p = np.digitize(new_state[0], pos_bins) 
+            new_state_v = np.digitize(new_state[1], vel_bins) 
+            new_state_a = np.digitize(new_state[2], angle_bins) 
+            new_state_av = np.digitize(new_state[3], ang_vel_bins) 
             
             # Clamp to valid indices
-            new_state_p = max(0, min(new_state_p, len(pos_bins) - 1))
-            new_state_v = max(0, min(new_state_v, len(vel_bins) - 1))
-            new_state_a = max(0, min(new_state_a, len(angle_bins) - 1))
-            new_state_av = max(0, min(new_state_av, len(ang_vel_bins) - 1))
+            new_state_p = max(0, min(new_state_p, len(pos_bins) ))
+            new_state_v = max(0, min(new_state_v, len(vel_bins) ))
+            new_state_a = max(0, min(new_state_a, len(angle_bins) ))
+            new_state_av = max(0, min(new_state_av, len(ang_vel_bins)))
 
             # Q-table update rule
             q_table[state_p, state_v, state_a, state_av, action] = \
